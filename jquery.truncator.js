@@ -8,45 +8,66 @@
 
   $.fn.truncate = function(options) {
 
-    var opts = $.extend({}, $.fn.truncate.defaults, options);
+    var opts = (!('retain' in options) || options.retain)
+             ? $.extend({}, $.fn.truncate.defaults.retain, options)
+             : $.extend({}, $.fn.truncate.defaults.discard, options);
 
     $(this).each(function() {
 
       var content_length = $.trim(squeeze($(this).text())).length;
       if (content_length <= opts.max_length)
         return;  // bail early if not overlong
-      
+
       // include more text, link prefix, and link suffix in max length
-      var actual_max_length = opts.max_length - opts.more.length - opts.link_prefix.length - opts.link_suffix.length;
+      var actual_max_length = opts.max_length - opts.more.length;
+      if (opts.retain)
+        actual_max_length -= opts.link_prefix.length + opts.link_suffix.length;
 
       var truncated_node = recursivelyTruncate(this, actual_max_length);
       var full_node = $(this).hide();
 
       truncated_node.insertAfter(full_node);
 
-      findNodeForMore(truncated_node).append(opts.link_prefix+'<a href="#more" class="'+opts.css_more_class+'">'+opts.more+'</a>'+opts.link_suffix);
-      findNodeForLess(full_node).append(opts.link_prefix+'<a href="#less" class="'+opts.css_less_class+'">'+opts.less+'</a>'+opts.link_suffix);
+      if (opts.retain) {
+        findNodeForMore(truncated_node).append(opts.link_prefix
+          + '<a href="#more" class="'+opts.css_more_class+'">'+opts.more+'</a>'
+          + opts.link_suffix);
+        findNodeForLess(full_node).append(opts.link_prefix
+          + '<a href="#less" class="'+opts.css_less_class+'">'+opts.less+'</a>'
+          + opts.link_suffix);
 
-      truncated_node.find('a:last').click(function() {
-        truncated_node.hide(); full_node.show(); return false;
-      });
-      full_node.find('a:last').click(function() {
-        truncated_node.show(); full_node.hide(); return false;
-      });
-
+        truncated_node.find('a:last').click(function() {
+          truncated_node.hide(); full_node.show(); return false;
+        });
+        full_node.find('a:last').click(function() {
+          truncated_node.show(); full_node.hide(); return false;
+        });
+      } else {
+        findNodeForMore(truncated_node).append('<span class="'+opts.css_more_class+'">'+opts.more+'</span>');
+        full_node.remove();
+      }
     });
   }
 
   // Note that the " (…more)" bit counts towards the max length – so a max
   // length of 10 would truncate "1234567890" to "12 (…more)".
   $.fn.truncate.defaults = {
-    max_length: 100,
-    more: '…more',
-    less: 'less',
-    css_more_class: 'truncator-link truncator-more',
-    css_less_class: 'truncator-link truncator-less',
-    link_prefix: ' (',
-    link_suffix: ')'
+    retain: {
+      max_length: 100,
+      retain: true,
+      more: '…more',
+      less: 'less',
+      css_more_class: 'truncator-link truncator-more',
+      css_less_class: 'truncator-link truncator-more',
+      link_prefix: ' (',
+      link_suffix: ')'
+    },
+    discard: {
+      max_length: 100,
+      retain: false,
+      more: ' … ',
+      css_more_class: 'truncator-more'
+    }
   };
 
   function recursivelyTruncate(node, max_length) {
